@@ -1,4 +1,4 @@
-# Neighborhood Library App (Take-Home)
+# Neighborhood Library App
 
 Beginner-friendly full-stack submission for the Neighborhood Library assignment:
 - FastAPI backend (REST) as the source of truth
