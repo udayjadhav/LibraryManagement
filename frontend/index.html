@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neighborhood Library UI</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f5f7fb; color: #1f2937; }
+    .page { max-width: 1100px; margin: 24px auto; padding: 0 16px 32px; }
+    .title { margin-bottom: 16px; }
+    .title h1 { margin: 0; font-size: 1.8rem; }
+    .hint { color: #6b7280; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .card { background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .card h2 { margin-top: 0; font-size: 1.05rem; }
+    .row { margin-bottom: 10px; }
+    label { display: block; font-size: 0.85rem; margin-bottom: 3px; color: #4b5563; }
+    input, select { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; }
+    button { background: #2563eb; color: white; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    .row-inline { display: flex; gap: 8px; align-items: center; }
+    .status { padding: 10px; border-radius: 6px; margin: 12px 0; font-size: 0.92rem; }
+    .status.ok { background: #ecfdf5; border: 1px solid #10b981; color: #065f46; }
+    .status.err { background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f9fafb; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+    .toolbar input, .toolbar select { max-width: 220px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const API_BASE = "";
+
+    function App() {
+      const [books, setBooks] = React.useState([]);
+      const [members, setMembers] = React.useState([]);
+      const [borrowings, setBorrowings] = React.useState([]);
+      const [message, setMessage] = React.useState({ type: "ok", text: "" });
+      const [loading, setLoading] = React.useState(false);
+
+      const [bookForm, setBookForm] = React.useState({ title: "", author: "", description: "" });
+      const [memberForm, setMemberForm] = React.useState({ name: "", email: "", phone: "" });
+      const [borrowForm, setBorrowForm] = React.useState({ member_id: "", book_id: "" });
+      const [returnBorrowingId, setReturnBorrowingId] = React.useState("");
+      const [borrowingFilter, setBorrowingFilter] = React.useState({ active_only: "true", member_id: "" });
+
+      React.useEffect(() => {
+        reloadAll();
+      }, []);
+
+      async function callApi(path, options = {}) {
+        const response = await fetch(`${API_BASE}${path}`, {
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options
+        });
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (_) {
+          data = null;
+        }
+        if (!response.ok) {
+          const detail = data && data.detail ? data.detail : `Request failed (${response.status})`;
+          throw new Error(detail);
+        }
+        return data;
+      }
+
+      function notify(type, text) {
+        setMessage({ type, text });
+      }
+
+      async function withLoading(action, successMessage = "") {
+        setLoading(true);
+        try {
+          await action();
+          if (successMessage) notify("ok", successMessage);
+        } catch (error) {
+          notify("err", error.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function reloadAll() {
+        await withLoading(async () => {
+          const [booksData, membersData, borrowingsData] = await Promise.all([
+            callApi("/books"),
+            callApi("/members"),
+            callApi("/borrowings?active_only=false")
+          ]);
+          setBooks(booksData);
+          setMembers(membersData);
+          setBorrowings(borrowingsData);
+        });
+      }
+
+      async function createBook(event) {
+        event.preventDefault();
+        await withLoading(async () => {
+          await callApi("/books", { method: "POST", body: JSON.stringify(bookForm) });
+          setBookForm({ title: "", author: "", description: "" });
+          await reloadAll();
+        }, "Book created");
+      }
+
+      async function createMember(event) {
+        event.preventDefault();
+        await withLoading(async () => {
+          await callApi("/members", { method: "POST", body: JSON.stringify(memberForm) });
+          setMemberForm({ name: "", email: "", phone: "" });
+          await reloadAll();
+        }, "Member created");
+      }
+
+      async function borrowBook(event) {
+        event.preventDefault();
+        await withLoading(async () => {
+          await callApi("/borrowings/borrow", {
+            method: "POST",
+            body: JSON.stringify({
+              member_id: Number(borrowForm.member_id),
+              book_id: Number(borrowForm.book_id)
+            })
+          });
+          setBorrowForm({ member_id: "", book_id: "" });
+          await reloadAll();
+        }, "Borrowing recorded");
+      }
+
+      async function returnBorrowing(event) {
+        event.preventDefault();
+        await withLoading(async () => {
+          await callApi(`/borrowings/${Number(returnBorrowingId)}/return`, { method: "POST" });
+          setReturnBorrowingId("");
+          await reloadAll();
+        }, "Return recorded");
+      }
+
+      async function loadBorrowings(event) {
+        event.preventDefault();
+        const params = new URLSearchParams();
+        params.set("active_only", borrowingFilter.active_only);
+        if (borrowingFilter.member_id) params.set("member_id", borrowingFilter.member_id);
+        await withLoading(async () => {
+          const data = await callApi(`/borrowings?${params.toString()}`);
+          setBorrowings(data);
+        });
+      }
+
+      return (
+        <div className="page">
+          <div className="title">
+            <h1>Neighborhood Library UI</h1>
+            <div className="hint">Simple React page using your FastAPI endpoints as the source of truth.</div>
+          </div>
+
+          {message.text ? (
+            <div className={`status ${message.type === "err" ? "err" : "ok"}`}>{message.text}</div>
+          ) : null}
+
+          <div className="grid">
+            <div className="card">
+              <h2>Create Book</h2>
+              <form onSubmit={createBook}>
+                <div className="row"><label>Title</label><input required value={bookForm.title} onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })} /></div>
+                <div className="row"><label>Author</label><input required value={bookForm.author} onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })} /></div>
+                <div className="row"><label>Description</label><input value={bookForm.description} onChange={(e) => setBookForm({ ...bookForm, description: e.target.value })} /></div>
+                <button disabled={loading}>Create Book</button>
+              </form>
+            </div>
+
+            <div className="card">
+              <h2>Create Member</h2>
+              <form onSubmit={createMember}>
+                <div className="row"><label>Name</label><input required value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} /></div>
+                <div className="row"><label>Email</label><input required type="email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} /></div>
+                <div className="row"><label>Phone</label><input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} /></div>
+                <button disabled={loading}>Create Member</button>
+              </form>
+            </div>
+
+            <div className="card">
+              <h2>Borrow Book</h2>
+              <form onSubmit={borrowBook}>
+                <div className="row"><label>Member ID</label><input required type="number" min="1" value={borrowForm.member_id} onChange={(e) => setBorrowForm({ ...borrowForm, member_id: e.target.value })} /></div>
+                <div className="row"><label>Book ID</label><input required type="number" min="1" value={borrowForm.book_id} onChange={(e) => setBorrowForm({ ...borrowForm, book_id: e.target.value })} /></div>
+                <button disabled={loading}>Borrow</button>
+              </form>
+            </div>
+
+            <div className="card">
+              <h2>Return Borrowing</h2>
+              <form onSubmit={returnBorrowing}>
+                <div className="row"><label>Borrowing ID</label><input required type="number" min="1" value={returnBorrowingId} onChange={(e) => setReturnBorrowingId(e.target.value)} /></div>
+                <button disabled={loading}>Return</button>
+              </form>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginTop: "16px" }}>
+            <h2>Books</h2>
+            <button disabled={loading} onClick={reloadAll}>Refresh Data</button>
+            <table>
+              <thead><tr><th>ID</th><th>Title</th><th>Author</th><th>Borrowed</th></tr></thead>
+              <tbody>
+                {books.map((b) => (
+                  <tr key={b.id}><td>{b.id}</td><td>{b.title}</td><td>{b.author}</td><td>{b.is_borrowed ? "Yes" : "No"}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card" style={{ marginTop: "16px" }}>
+            <h2>Members</h2>
+            <table>
+              <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Active</th></tr></thead>
+              <tbody>
+                {members.map((m) => (
+                  <tr key={m.id}><td>{m.id}</td><td>{m.name}</td><td>{m.email}</td><td>{m.active ? "Yes" : "No"}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card" style={{ marginTop: "16px" }}>
+            <h2>Borrowings</h2>
+            <form className="toolbar" onSubmit={loadBorrowings}>
+              <select value={borrowingFilter.active_only} onChange={(e) => setBorrowingFilter({ ...borrowingFilter, active_only: e.target.value })}>
+                <option value="true">Active only</option>
+                <option value="false">All</option>
+              </select>
+              <input type="number" min="1" placeholder="Optional member ID" value={borrowingFilter.member_id} onChange={(e) => setBorrowingFilter({ ...borrowingFilter, member_id: e.target.value })} />
+              <button disabled={loading}>Apply Filter</button>
+            </form>
+            <table>
+              <thead><tr><th>ID</th><th>Member</th><th>Book</th><th>Borrowed At</th><th>Returned At</th></tr></thead>
+              <tbody>
+                {borrowings.map((br) => (
+                  <tr key={br.id}>
+                    <td>{br.id}</td>
+                    <td>{br.member_id}</td>
+                    <td>{br.book_id}</td>
+                    <td>{new Date(br.borrowed_at).toLocaleString()}</td>
+                    <td>{br.returned_at ? new Date(br.returned_at).toLocaleString() : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
