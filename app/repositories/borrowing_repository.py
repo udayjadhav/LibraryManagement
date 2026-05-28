@@ -1,27 +1,27 @@
 from sqlalchemy import Select, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Borrowing
 
 
 class BorrowingRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def get(self, borrowing_id: int) -> Borrowing | None:
-        return self.db.get(Borrowing, borrowing_id)
+    async def get(self, borrowing_id: int) -> Borrowing | None:
+        return await self.db.get(Borrowing, borrowing_id)
 
-    def get_active_for_book(self, book_id: int) -> Borrowing | None:
-        return self.db.scalar(
+    async def get_active_for_book(self, book_id: int) -> Borrowing | None:
+        return await self.db.scalar(
             select(Borrowing).where(
                 Borrowing.book_id == book_id, Borrowing.returned_at.is_(None)
             )
         )
 
-    def get_other_active_for_book(
+    async def get_other_active_for_book(
         self, book_id: int, exclude_id: int
     ) -> Borrowing | None:
-        return self.db.scalar(
+        return await self.db.scalar(
             select(Borrowing).where(
                 Borrowing.book_id == book_id,
                 Borrowing.returned_at.is_(None),
@@ -29,7 +29,7 @@ class BorrowingRepository:
             )
         )
 
-    def list_borrowings(
+    async def list_borrowings(
         self, member_id: int | None = None, active_only: bool = True
     ) -> list[Borrowing]:
         statement: Select[tuple[Borrowing]] = select(Borrowing).order_by(Borrowing.id)
@@ -37,17 +37,18 @@ class BorrowingRepository:
             statement = statement.where(Borrowing.member_id == member_id)
         if active_only:
             statement = statement.where(Borrowing.returned_at.is_(None))
-        return list(self.db.scalars(statement))
+        result = await self.db.scalars(statement)
+        return list(result)
 
-    def add(self, borrowing: Borrowing) -> None:
+    async def add(self, borrowing: Borrowing) -> None:
         self.db.add(borrowing)
 
-    def commit(self) -> None:
-        self.db.commit()
+    async def commit(self) -> None:
+        await self.db.commit()
 
-    def rollback(self) -> None:
-        self.db.rollback()
+    async def rollback(self) -> None:
+        await self.db.rollback()
 
-    def refresh(self, borrowing: Borrowing) -> Borrowing:
-        self.db.refresh(borrowing)
+    async def refresh(self, borrowing: Borrowing) -> Borrowing:
+        await self.db.refresh(borrowing)
         return borrowing

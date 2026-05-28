@@ -14,7 +14,6 @@ import os
 
 import requests
 
-
 BASE_URL = os.getenv("LIBRARY_API_BASE_URL", "http://127.0.0.1:8000")
 
 
@@ -30,14 +29,22 @@ def main() -> None:
     member = call(
         "POST",
         "/members",
-        {"name": "Sample User", "email": "sample.user@example.com", "phone": "9999999999"},
+        {
+            "name": "Sample User",
+            "email": "sample.user@example.com",
+            "phone": "9999999999",
+        },
     )
     print("Created member:", member)
 
     book = call(
         "POST",
         "/books",
-        {"title": "Sample Book", "author": "Sample Author", "description": "Demo title"},
+        {
+            "title": "Sample Book",
+            "author": "Sample Author",
+            "description": "Demo title",
+        },
     )
     print("Created book:", book)
 

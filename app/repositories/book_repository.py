@@ -1,38 +1,39 @@
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Book
 
 
 class BookRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def create(self, **fields) -> Book:
+    async def create(self, **fields) -> Book:
         book = Book(**fields)
         self.db.add(book)
-        self.db.commit()
-        self.db.refresh(book)
+        await self.db.commit()
+        await self.db.refresh(book)
         return book
 
-    def get(self, book_id: int) -> Book | None:
-        return self.db.get(Book, book_id)
+    async def get(self, book_id: int) -> Book | None:
+        return await self.db.get(Book, book_id)
 
-    def list_all(self) -> list[Book]:
-        return list(self.db.scalars(select(Book).order_by(Book.id)))
+    async def list_all(self) -> list[Book]:
+        result = await self.db.scalars(select(Book).order_by(Book.id))
+        return list(result)
 
-    def get_by_title_author(self, title: str, author: str) -> Book | None:
-        return self.db.scalar(
+    async def get_by_title_author(self, title: str, author: str) -> Book | None:
+        return await self.db.scalar(
             select(Book).where(
                 func.lower(func.trim(Book.title)) == title,
                 func.lower(func.trim(Book.author)) == author,
             )
         )
 
-    def get_other_by_title_author(
+    async def get_other_by_title_author(
         self, title: str, author: str, exclude_id: int
     ) -> Book | None:
-        return self.db.scalar(
+        return await self.db.scalar(
             select(Book).where(
                 func.lower(func.trim(Book.title)) == title,
                 func.lower(func.trim(Book.author)) == author,
@@ -40,7 +41,7 @@ class BookRepository:
             )
         )
 
-    def save(self, book: Book) -> Book:
-        self.db.commit()
-        self.db.refresh(book)
+    async def save(self, book: Book) -> Book:
+        await self.db.commit()
+        await self.db.refresh(book)
         return book

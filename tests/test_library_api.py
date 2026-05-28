@@ -1,36 +1,35 @@
+import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.main import app
 
-# Keep tests file-free by using in-memory SQLite.
-TEST_DATABASE_URL = "sqlite://"
-engine = create_engine(
+# Keep tests file-free by using in-memory async SQLite.
+TEST_DATABASE_URL = "sqlite+aiosqlite://"
+engine = create_async_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TestingSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def override_get_db():
+    async with TestingSessionLocal() as session:
+        yield session
 
 
 app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
 
 
-def setup_function():
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+@pytest.fixture(autouse=True)
+async def setup_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
 
 
 def test_ui_root_is_served():

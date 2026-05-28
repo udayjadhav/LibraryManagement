@@ -18,10 +18,10 @@ VALIDATION_ERROR = {
     status_code=status.HTTP_201_CREATED,
     responses={409: {"description": "Member email already exists"}, **VALIDATION_ERROR},
 )
-def create_member(
+async def create_member(
     payload: MemberCreate, service: MemberService = Depends(get_member_service)
 ) -> Member:
-    return service.create_member(payload)
+    return await service.create_member(payload)
 
 
 @router.put(
@@ -33,14 +33,16 @@ def create_member(
         **VALIDATION_ERROR,
     },
 )
-def update_member(
+async def update_member(
     member_id: int,
     payload: MemberUpdate,
     service: MemberService = Depends(get_member_service),
 ) -> Member:
-    return service.update_member(member_id, payload)
+    return await service.update_member(member_id, payload)
 
 
 @router.get("", response_model=list[MemberOut])
-def list_members(service: MemberService = Depends(get_member_service)) -> list[Member]:
-    return service.list_members()
+async def list_members(
+    service: MemberService = Depends(get_member_service),
+) -> list[Member]:
+    return await service.list_members()

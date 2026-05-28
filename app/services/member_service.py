@@ -10,12 +10,12 @@ class MemberService:
     def __init__(self, repository: MemberRepository) -> None:
         self.repository = repository
 
-    def create_member(self, payload: MemberCreate) -> Member:
+    async def create_member(self, payload: MemberCreate) -> Member:
         normalized_email = self._normalize_email(payload.email)
-        if self.repository.get_by_email(normalized_email):
+        if await self.repository.get_by_email(normalized_email):
             raise ConflictError("Member email already exists")
         try:
-            return self.repository.create(
+            return await self.repository.create(
                 name=payload.name,
                 email=normalized_email,
                 phone=payload.phone,
@@ -23,8 +23,8 @@ class MemberService:
         except IntegrityError as exc:
             raise ConflictError("Member email already exists") from exc
 
-    def update_member(self, member_id: int, payload: MemberUpdate) -> Member:
-        member = self.repository.get(member_id)
+    async def update_member(self, member_id: int, payload: MemberUpdate) -> Member:
+        member = await self.repository.get(member_id)
         if not member:
             raise NotFoundError("Member not found")
 
@@ -35,19 +35,19 @@ class MemberService:
         if "email" in updated_fields and updated_fields[
             "email"
         ] != self._normalize_email(member.email):
-            if self.repository.get_by_email(updated_fields["email"]):
+            if await self.repository.get_by_email(updated_fields["email"]):
                 raise ConflictError("Member email already exists")
 
         for key, value in updated_fields.items():
             setattr(member, key, value)
 
         try:
-            return self.repository.save(member)
+            return await self.repository.save(member)
         except IntegrityError as exc:
             raise ConflictError("Member email already exists") from exc
 
-    def list_members(self) -> list[Member]:
-        return self.repository.list_all()
+    async def list_members(self) -> list[Member]:
+        return await self.repository.list_all()
 
     @staticmethod
     def _normalize_email(email: str) -> str:

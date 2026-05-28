@@ -1,23 +1,35 @@
 import os
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import declarative_base
 
-# Default keeps local setup easy; set DATABASE_URL to PostgreSQL in real usage.
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./library.db")
+# Default: local Postgres via docker-compose (assignment-compliant primary path).
+DEFAULT_DATABASE_URL = "postgresql+psycopg://library:library@localhost:5432/library_db"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
 
-connect_args = {}
-if DATABASE_URL.startswith("sqlite"):
+
+def to_async_database_url(url: str) -> str:
+    """Normalize common sync-style URLs to async SQLAlchemy drivers."""
+    if url.startswith("sqlite:///"):
+        return url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
+ASYNC_DATABASE_URL = to_async_database_url(DATABASE_URL)
+
+connect_args: dict = {}
+if ASYNC_DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_async_engine(ASYNC_DATABASE_URL, connect_args=connect_args)
+AsyncSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 Base = declarative_base()
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session

@@ -10,15 +10,17 @@ class BookService:
     def __init__(self, repository: BookRepository) -> None:
         self.repository = repository
 
-    def create_book(self, payload: BookCreate) -> Book:
+    async def create_book(self, payload: BookCreate) -> Book:
         title = payload.title.strip()
         author = payload.author.strip()
         normalized_title, normalized_author = self._normalized_book_key(title, author)
-        if self.repository.get_by_title_author(normalized_title, normalized_author):
+        if await self.repository.get_by_title_author(
+            normalized_title, normalized_author
+        ):
             raise ConflictError("Book with same title and author already exists")
 
         try:
-            return self.repository.create(
+            return await self.repository.create(
                 title=title, author=author, description=payload.description
             )
         except IntegrityError as exc:
@@ -26,8 +28,8 @@ class BookService:
                 "Book with same title and author already exists"
             ) from exc
 
-    def update_book(self, book_id: int, payload: BookUpdate) -> Book:
-        book = self.repository.get(book_id)
+    async def update_book(self, book_id: int, payload: BookUpdate) -> Book:
+        book = await self.repository.get(book_id)
         if not book:
             raise NotFoundError("Book not found")
 
@@ -42,7 +44,7 @@ class BookService:
         normalized_title, normalized_author = self._normalized_book_key(
             next_title, next_author
         )
-        if self.repository.get_other_by_title_author(
+        if await self.repository.get_other_by_title_author(
             normalized_title, normalized_author, book_id
         ):
             raise ConflictError("Book with same title and author already exists")
@@ -51,14 +53,14 @@ class BookService:
             setattr(book, key, value)
 
         try:
-            return self.repository.save(book)
+            return await self.repository.save(book)
         except IntegrityError as exc:
             raise ConflictError(
                 "Book with same title and author already exists"
             ) from exc
 
-    def list_books(self) -> list[Book]:
-        return self.repository.list_all()
+    async def list_books(self) -> list[Book]:
+        return await self.repository.list_all()
 
     @staticmethod
     def _normalized_book_key(title: str, author: str) -> tuple[str, str]:

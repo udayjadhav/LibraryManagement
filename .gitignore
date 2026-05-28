@@ -9,6 +9,7 @@ venv/
 .coverage
 htmlcov/
 .DS_Store
+.env
 library.db
 test_library.db
 *.sqlite3

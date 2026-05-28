@@ -27,7 +27,7 @@ Think of the app like a small library desk:
 
 - **API routes** (`app/api/`) — front desk: accepts HTTP requests and returns responses.
 - **Services** (`app/services/`) — librarian rules: who can borrow, duplicate email checks, return logic.
-- **Repositories** (`app/repositories/`) — card catalog: all database reads and writes.
+- **Repositories** (`app/repositories/`) — card catalog: async SQLAlchemy reads and writes.
 - **Models** (`app/models/`) — shelf labels: SQLAlchemy tables (`Book`, `Member`, `Borrowing`).
 - **Schemas** (`app/schemas/`) — request/response forms: Pydantic validation and JSON shapes.
 
@@ -53,6 +53,8 @@ Think of the app like a small library desk:
 │   ├── test_library_api.py
 │   └── test_services.py
 ├── pyproject.toml        # Primary Python config (deps, pytest, ruff, black)
+├── docker-compose.yml    # Local PostgreSQL (default database)
+├── .env.example          # Sample DATABASE_URL values
 ├── .pre-commit-config.yaml
 ├── requirements.txt      # Backward-compatible install list
 ├── .gitignore
@@ -63,7 +65,7 @@ Think of the app like a small library desk:
 
 - Python 3.11+
 - pip
-- (Optional) PostgreSQL if you want to run with Postgres instead of SQLite
+- Docker and Docker Compose (recommended — default local database is PostgreSQL)
 
 ## One-Time Setup
 
@@ -72,6 +74,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pre-commit install
+cp .env.example .env   # optional; defaults match docker-compose Postgres
 ```
 
 `pyproject.toml` is the primary project config (dependencies, pytest, ruff, black).  
@@ -82,6 +85,40 @@ pre-commit install
 ```bash
 pip install -r requirements.txt
 ```
+
+## Local PostgreSQL (Default)
+
+The app defaults to PostgreSQL for assignment compliance. Start Postgres with Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+Wait until Postgres is healthy:
+
+```bash
+docker compose ps
+```
+
+Default connection (no env override needed):
+
+```text
+postgresql+psycopg://library:library@localhost:5432/library_db
+```
+
+Stop Postgres when finished:
+
+```bash
+docker compose down
+```
+
+To remove the database volume as well:
+
+```bash
+docker compose down -v
+```
+
+If `docker compose` is not available on your machine yet, use the SQLite fallback in the next section so you can still run the app immediately.
 
 ## Development Commands
 
@@ -116,20 +153,48 @@ LIBRARY_API_BASE_URL=http://127.0.0.1:8000 python scripts/sample_client.py
 ## Environment Variables
 
 - `DATABASE_URL` (optional)
-  - Default: `sqlite:///./library.db`
-  - Example Postgres:
-    ```bash
-    export DATABASE_URL="postgresql+psycopg://<user>:<password>@localhost:5432/library_db"
+  - **Default (Postgres via docker-compose):**
+    ```text
+    postgresql+psycopg://library:library@localhost:5432/library_db
     ```
+  - **Optional SQLite fallback** (no Docker required):
+    ```bash
+    export DATABASE_URL="sqlite+aiosqlite:///./library.db"
+    ```
+  - Copy `.env.example` to `.env` to customize locally.
+
+## Quick Run Without Docker (SQLite Fallback)
+
+Use this when Docker/Postgres is unavailable locally.
+
+```bash
+source .venv/bin/activate
+export DATABASE_URL="sqlite+aiosqlite:///./library.db"
+uvicorn app.main:app --reload
+```
 
 ## Local Run
 
 ```bash
+# 1) Start Postgres (default path)
+docker compose up -d
+
+# 2) Activate venv and install
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+
+# 3) Run API + UI
 uvicorn app.main:app --reload
 ```
+
+If startup fails with Postgres connection errors (for example `connection refused` on `localhost:5432`), either:
+- start PostgreSQL first (`docker compose up -d`), or
+- switch to SQLite fallback:
+  ```bash
+  export DATABASE_URL="sqlite+aiosqlite:///./library.db"
+  uvicorn app.main:app --reload
+  ```
 
 App URLs:
 - UI: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
@@ -193,6 +258,8 @@ Commit:
 - `frontend/`
 - `tests/`
 - `pyproject.toml`
+- `docker-compose.yml`
+- `.env.example`
 - `.pre-commit-config.yaml`
 - `requirements.txt`
 - `.gitignore`

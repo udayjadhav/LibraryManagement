@@ -23,11 +23,11 @@ VALIDATION_ERROR = {
         **VALIDATION_ERROR,
     },
 )
-def borrow_book(
+async def borrow_book(
     payload: BorrowBookRequest,
     service: BorrowingService = Depends(get_borrowing_service),
 ) -> Borrowing:
-    return service.borrow_book(payload)
+    return await service.borrow_book(payload)
 
 
 @router.post(
@@ -38,16 +38,16 @@ def borrow_book(
         409: {"description": "Book already returned"},
     },
 )
-def return_book(
+async def return_book(
     borrowing_id: int, service: BorrowingService = Depends(get_borrowing_service)
 ) -> Borrowing:
-    return service.return_book(borrowing_id)
+    return await service.return_book(borrowing_id)
 
 
 @router.get("", response_model=list[BorrowingOut])
-def list_borrowings(
+async def list_borrowings(
     member_id: int | None = Query(default=None),
     active_only: bool = Query(default=True),
     service: BorrowingService = Depends(get_borrowing_service),
 ) -> list[Borrowing]:
-    return service.list_borrowings(member_id, active_only)
+    return await service.list_borrowings(member_id, active_only)

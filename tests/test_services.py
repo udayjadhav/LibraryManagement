@@ -1,5 +1,5 @@
 from datetime import datetime, UTC
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -18,17 +18,19 @@ from app.services.borrowing_service import BorrowingService
 from app.services.member_service import MemberService
 
 
-def test_book_service_update_not_found():
-    repo = MagicMock()
+@pytest.mark.asyncio
+async def test_book_service_update_not_found():
+    repo = AsyncMock()
     repo.get.return_value = None
     service = BookService(repo)
 
     with pytest.raises(NotFoundError, match="Book not found"):
-        service.update_book(1, BookUpdate(title="New Title"))
+        await service.update_book(1, BookUpdate(title="New Title"))
 
 
-def test_book_service_create():
-    repo = MagicMock()
+@pytest.mark.asyncio
+async def test_book_service_create():
+    repo = AsyncMock()
     repo.get_by_title_author.return_value = None
     expected = Book(
         id=1, title="T", author="A", is_borrowed=False, created_at=datetime.now(UTC)
@@ -36,13 +38,14 @@ def test_book_service_create():
     repo.create.return_value = expected
     service = BookService(repo)
 
-    result = service.create_book(BookCreate(title="T", author="A"))
+    result = await service.create_book(BookCreate(title="T", author="A"))
     assert result == expected
-    repo.create.assert_called_once()
+    repo.create.assert_awaited_once()
 
 
-def test_book_service_duplicate_on_create_case_insensitive():
-    repo = MagicMock()
+@pytest.mark.asyncio
+async def test_book_service_duplicate_on_create_case_insensitive():
+    repo = AsyncMock()
     repo.get_by_title_author.return_value = Book(
         id=1, title="Dune", author="Frank Herbert", created_at=datetime.now(UTC)
     )
@@ -51,11 +54,12 @@ def test_book_service_duplicate_on_create_case_insensitive():
     with pytest.raises(
         ConflictError, match="Book with same title and author already exists"
     ):
-        service.create_book(BookCreate(title=" dune ", author=" FRANK HERBERT "))
+        await service.create_book(BookCreate(title=" dune ", author=" FRANK HERBERT "))
 
 
-def test_book_service_duplicate_on_update():
-    repo = MagicMock()
+@pytest.mark.asyncio
+async def test_book_service_duplicate_on_update():
+    repo = AsyncMock()
     existing = Book(
         id=2, title="Dune", author="Frank Herbert", created_at=datetime.now(UTC)
     )
@@ -68,31 +72,36 @@ def test_book_service_duplicate_on_update():
     with pytest.raises(
         ConflictError, match="Book with same title and author already exists"
     ):
-        service.update_book(2, BookUpdate(title=" dune ", author=" FRANK HERBERT "))
+        await service.update_book(
+            2, BookUpdate(title=" dune ", author=" FRANK HERBERT ")
+        )
 
 
-def test_member_service_duplicate_email_on_create():
-    repo = MagicMock()
+@pytest.mark.asyncio
+async def test_member_service_duplicate_email_on_create():
+    repo = AsyncMock()
     repo.get_by_email.return_value = Member(
         id=1, name="X", email="a@example.com", active=True, created_at=datetime.now(UTC)
     )
     service = MemberService(repo)
 
     with pytest.raises(ConflictError, match="Member email already exists"):
-        service.create_member(MemberCreate(name="Y", email="a@example.com"))
+        await service.create_member(MemberCreate(name="Y", email="a@example.com"))
 
 
-def test_member_service_update_not_found():
-    repo = MagicMock()
+@pytest.mark.asyncio
+async def test_member_service_update_not_found():
+    repo = AsyncMock()
     repo.get.return_value = None
     service = MemberService(repo)
 
     with pytest.raises(NotFoundError, match="Member not found"):
-        service.update_member(1, MemberUpdate(name="New"))
+        await service.update_member(1, MemberUpdate(name="New"))
 
 
-def test_member_service_duplicate_email_on_update_case_insensitive():
-    repo = MagicMock()
+@pytest.mark.asyncio
+async def test_member_service_duplicate_email_on_update_case_insensitive():
+    repo = AsyncMock()
     repo.get.return_value = Member(
         id=2, name="B", email="b@example.com", active=True, created_at=datetime.now(UTC)
     )
@@ -102,10 +111,11 @@ def test_member_service_duplicate_email_on_update_case_insensitive():
     service = MemberService(repo)
 
     with pytest.raises(ConflictError, match="Member email already exists"):
-        service.update_member(2, MemberUpdate(email="  A@Example.com "))
+        await service.update_member(2, MemberUpdate(email="  A@Example.com "))
 
 
-def test_borrowing_service_inactive_member():
+@pytest.mark.asyncio
+async def test_borrowing_service_inactive_member():
     member = Member(
         id=1,
         name="A",
@@ -113,78 +123,82 @@ def test_borrowing_service_inactive_member():
         active=False,
         created_at=datetime.now(UTC),
     )
-    member_repo = MagicMock()
+    member_repo = AsyncMock()
     member_repo.get.return_value = member
-    book_repo = MagicMock()
-    borrowing_repo = MagicMock()
+    book_repo = AsyncMock()
+    borrowing_repo = AsyncMock()
     service = BorrowingService(borrowing_repo, book_repo, member_repo)
 
     with pytest.raises(BadRequestError, match="Inactive member cannot borrow books"):
-        service.borrow_book(BorrowBookRequest(member_id=1, book_id=1))
+        await service.borrow_book(BorrowBookRequest(member_id=1, book_id=1))
 
 
-def test_borrowing_service_book_already_borrowed():
+@pytest.mark.asyncio
+async def test_borrowing_service_book_already_borrowed():
     member = Member(
         id=1, name="A", email="a@example.com", active=True, created_at=datetime.now(UTC)
     )
     book = Book(
         id=1, title="T", author="A", is_borrowed=True, created_at=datetime.now(UTC)
     )
-    member_repo = MagicMock()
+    member_repo = AsyncMock()
     member_repo.get.return_value = member
-    book_repo = MagicMock()
+    book_repo = AsyncMock()
     book_repo.get.return_value = book
-    borrowing_repo = MagicMock()
+    borrowing_repo = AsyncMock()
     borrowing_repo.get_active_for_book.return_value = None
     service = BorrowingService(borrowing_repo, book_repo, member_repo)
 
     with pytest.raises(ConflictError, match="Book is already borrowed"):
-        service.borrow_book(BorrowBookRequest(member_id=1, book_id=1))
+        await service.borrow_book(BorrowBookRequest(member_id=1, book_id=1))
 
 
-def test_borrowing_service_active_borrowing_conflict_even_if_flag_not_set():
+@pytest.mark.asyncio
+async def test_borrowing_service_active_borrowing_conflict_even_if_flag_not_set():
     member = Member(
         id=1, name="A", email="a@example.com", active=True, created_at=datetime.now(UTC)
     )
     book = Book(
         id=1, title="T", author="A", is_borrowed=False, created_at=datetime.now(UTC)
     )
-    member_repo = MagicMock()
+    member_repo = AsyncMock()
     member_repo.get.return_value = member
-    book_repo = MagicMock()
+    book_repo = AsyncMock()
     book_repo.get.return_value = book
-    borrowing_repo = MagicMock()
+    borrowing_repo = AsyncMock()
     borrowing_repo.get_active_for_book.return_value = Borrowing(
         id=99, member_id=1, book_id=1, borrowed_at=datetime.now(UTC)
     )
     service = BorrowingService(borrowing_repo, book_repo, member_repo)
 
     with pytest.raises(ConflictError, match="Book is already borrowed"):
-        service.borrow_book(BorrowBookRequest(member_id=1, book_id=1))
+        await service.borrow_book(BorrowBookRequest(member_id=1, book_id=1))
 
 
-def test_borrowing_service_integrity_error_on_commit():
+@pytest.mark.asyncio
+async def test_borrowing_service_integrity_error_on_commit():
     member = Member(
         id=1, name="A", email="a@example.com", active=True, created_at=datetime.now(UTC)
     )
     book = Book(
         id=1, title="T", author="A", is_borrowed=False, created_at=datetime.now(UTC)
     )
-    member_repo = MagicMock()
+    member_repo = AsyncMock()
     member_repo.get.return_value = member
-    book_repo = MagicMock()
+    book_repo = AsyncMock()
     book_repo.get.return_value = book
-    borrowing_repo = MagicMock()
+    borrowing_repo = AsyncMock()
     borrowing_repo.get_active_for_book.return_value = None
     borrowing_repo.commit.side_effect = IntegrityError("stmt", {}, Exception())
     service = BorrowingService(borrowing_repo, book_repo, member_repo)
 
     with pytest.raises(ConflictError, match="Book is already borrowed"):
-        service.borrow_book(BorrowBookRequest(member_id=1, book_id=1))
-    borrowing_repo.rollback.assert_called_once()
+        await service.borrow_book(BorrowBookRequest(member_id=1, book_id=1))
+    borrowing_repo.rollback.assert_awaited_once()
 
 
-def test_borrowing_service_return_already_returned():
+@pytest.mark.asyncio
+async def test_borrowing_service_return_already_returned():
     borrowing = Borrowing(
         id=1,
         member_id=1,
@@ -192,9 +206,9 @@ def test_borrowing_service_return_already_returned():
         borrowed_at=datetime.now(UTC),
         returned_at=datetime.now(UTC),
     )
-    borrowing_repo = MagicMock()
+    borrowing_repo = AsyncMock()
     borrowing_repo.get.return_value = borrowing
     service = BorrowingService(borrowing_repo, MagicMock(), MagicMock())
 
     with pytest.raises(ConflictError, match="Book already returned"):
-        service.return_book(1)
+        await service.return_book(1)

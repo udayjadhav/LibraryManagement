@@ -21,10 +21,10 @@ VALIDATION_ERROR = {
         **VALIDATION_ERROR,
     },
 )
-def create_book(
+async def create_book(
     payload: BookCreate, service: BookService = Depends(get_book_service)
 ) -> Book:
-    return service.create_book(payload)
+    return await service.create_book(payload)
 
 
 @router.put(
@@ -36,12 +36,12 @@ def create_book(
         **VALIDATION_ERROR,
     },
 )
-def update_book(
+async def update_book(
     book_id: int, payload: BookUpdate, service: BookService = Depends(get_book_service)
 ) -> Book:
-    return service.update_book(book_id, payload)
+    return await service.update_book(book_id, payload)
 
 
 @router.get("", response_model=list[BookOut])
-def list_books(service: BookService = Depends(get_book_service)) -> list[Book]:
-    return service.list_books()
+async def list_books(service: BookService = Depends(get_book_service)) -> list[Book]:
+    return await service.list_books()

@@ -1,5 +1,5 @@
 from fastapi import Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.repositories.book_repository import BookRepository
@@ -10,15 +10,15 @@ from app.services.borrowing_service import BorrowingService
 from app.services.member_service import MemberService
 
 
-def get_book_repository(db: Session = Depends(get_db)) -> BookRepository:
+def get_book_repository(db: AsyncSession = Depends(get_db)) -> BookRepository:
     return BookRepository(db)
 
 
-def get_member_repository(db: Session = Depends(get_db)) -> MemberRepository:
+def get_member_repository(db: AsyncSession = Depends(get_db)) -> MemberRepository:
     return MemberRepository(db)
 
 
-def get_borrowing_repository(db: Session = Depends(get_db)) -> BorrowingRepository:
+def get_borrowing_repository(db: AsyncSession = Depends(get_db)) -> BorrowingRepository:
     return BorrowingRepository(db)
 
 

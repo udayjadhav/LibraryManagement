@@ -1,32 +1,33 @@
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Member
 
 
 class MemberRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def create(self, **fields) -> Member:
+    async def create(self, **fields) -> Member:
         member = Member(**fields)
         self.db.add(member)
-        self.db.commit()
-        self.db.refresh(member)
+        await self.db.commit()
+        await self.db.refresh(member)
         return member
 
-    def get(self, member_id: int) -> Member | None:
-        return self.db.get(Member, member_id)
+    async def get(self, member_id: int) -> Member | None:
+        return await self.db.get(Member, member_id)
 
-    def get_by_email(self, email: str) -> Member | None:
-        return self.db.scalar(
+    async def get_by_email(self, email: str) -> Member | None:
+        return await self.db.scalar(
             select(Member).where(func.lower(func.trim(Member.email)) == email)
         )
 
-    def list_all(self) -> list[Member]:
-        return list(self.db.scalars(select(Member).order_by(Member.id)))
+    async def list_all(self) -> list[Member]:
+        result = await self.db.scalars(select(Member).order_by(Member.id))
+        return list(result)
 
-    def save(self, member: Member) -> Member:
-        self.db.commit()
-        self.db.refresh(member)
+    async def save(self, member: Member) -> Member:
+        await self.db.commit()
+        await self.db.refresh(member)
         return member
