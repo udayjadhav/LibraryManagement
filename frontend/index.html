@@ -44,6 +44,12 @@
       const [members, setMembers] = React.useState([]);
       const [borrowings, setBorrowings] = React.useState([]);
       const [message, setMessage] = React.useState({ type: "ok", text: "" });
+      const [formErrors, setFormErrors] = React.useState({
+        book: "",
+        member: "",
+        borrow: "",
+        return: ""
+      });
       const [loading, setLoading] = React.useState(false);
 
       const [bookForm, setBookForm] = React.useState({ title: "", author: "", description: "" });
@@ -78,6 +84,14 @@
         setMessage({ type, text });
       }
 
+      function setFormError(formKey, text) {
+        setFormErrors((prev) => ({ ...prev, [formKey]: text }));
+      }
+
+      function clearFormError(formKey) {
+        setFormErrors((prev) => ({ ...prev, [formKey]: "" }));
+      }
+
       async function withLoading(action, successMessage = "") {
         setLoading(true);
         try {
@@ -105,25 +119,43 @@
 
       async function createBook(event) {
         event.preventDefault();
-        await withLoading(async () => {
+        clearFormError("book");
+        setLoading(true);
+        try {
           await callApi("/books", { method: "POST", body: JSON.stringify(bookForm) });
           setBookForm({ title: "", author: "", description: "" });
           await reloadAll();
-        }, "Book created");
+          notify("ok", "Book created");
+        } catch (error) {
+          setFormError("book", error.message);
+          notify("err", error.message);
+        } finally {
+          setLoading(false);
+        }
       }
 
       async function createMember(event) {
         event.preventDefault();
-        await withLoading(async () => {
+        clearFormError("member");
+        setLoading(true);
+        try {
           await callApi("/members", { method: "POST", body: JSON.stringify(memberForm) });
           setMemberForm({ name: "", email: "", phone: "" });
           await reloadAll();
-        }, "Member created");
+          notify("ok", "Member created");
+        } catch (error) {
+          setFormError("member", error.message);
+          notify("err", error.message);
+        } finally {
+          setLoading(false);
+        }
       }
 
       async function borrowBook(event) {
         event.preventDefault();
-        await withLoading(async () => {
+        clearFormError("borrow");
+        setLoading(true);
+        try {
           await callApi("/borrowings/borrow", {
             method: "POST",
             body: JSON.stringify({
@@ -133,16 +165,30 @@
           });
           setBorrowForm({ member_id: "", book_id: "" });
           await reloadAll();
-        }, "Borrowing recorded");
+          notify("ok", "Borrowing recorded");
+        } catch (error) {
+          setFormError("borrow", error.message);
+          notify("err", error.message);
+        } finally {
+          setLoading(false);
+        }
       }
 
       async function returnBorrowing(event) {
         event.preventDefault();
-        await withLoading(async () => {
+        clearFormError("return");
+        setLoading(true);
+        try {
           await callApi(`/borrowings/${Number(returnBorrowingId)}/return`, { method: "POST" });
           setReturnBorrowingId("");
           await reloadAll();
-        }, "Return recorded");
+          notify("ok", "Return recorded");
+        } catch (error) {
+          setFormError("return", error.message);
+          notify("err", error.message);
+        } finally {
+          setLoading(false);
+        }
       }
 
       async function loadBorrowings(event) {
@@ -175,6 +221,7 @@
                 <div className="row"><label>Author</label><input required value={bookForm.author} onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })} /></div>
                 <div className="row"><label>Description</label><input value={bookForm.description} onChange={(e) => setBookForm({ ...bookForm, description: e.target.value })} /></div>
                 <button disabled={loading}>Create Book</button>
+                {formErrors.book ? <div className="status err" style={{ marginTop: "10px" }}>{formErrors.book}</div> : null}
               </form>
             </div>
 
@@ -185,6 +232,7 @@
                 <div className="row"><label>Email</label><input required type="email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} /></div>
                 <div className="row"><label>Phone</label><input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} /></div>
                 <button disabled={loading}>Create Member</button>
+                {formErrors.member ? <div className="status err" style={{ marginTop: "10px" }}>{formErrors.member}</div> : null}
               </form>
             </div>
 
@@ -194,6 +242,7 @@
                 <div className="row"><label>Member ID</label><input required type="number" min="1" value={borrowForm.member_id} onChange={(e) => setBorrowForm({ ...borrowForm, member_id: e.target.value })} /></div>
                 <div className="row"><label>Book ID</label><input required type="number" min="1" value={borrowForm.book_id} onChange={(e) => setBorrowForm({ ...borrowForm, book_id: e.target.value })} /></div>
                 <button disabled={loading}>Borrow</button>
+                {formErrors.borrow ? <div className="status err" style={{ marginTop: "10px" }}>{formErrors.borrow}</div> : null}
               </form>
             </div>
 
@@ -202,6 +251,7 @@
               <form onSubmit={returnBorrowing}>
                 <div className="row"><label>Borrowing ID</label><input required type="number" min="1" value={returnBorrowingId} onChange={(e) => setReturnBorrowingId(e.target.value)} /></div>
                 <button disabled={loading}>Return</button>
+                {formErrors.return ? <div className="status err" style={{ marginTop: "10px" }}>{formErrors.return}</div> : null}
               </form>
             </div>
           </div>

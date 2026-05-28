@@ -3,7 +3,6 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-
 # Default keeps local setup easy; set DATABASE_URL to PostgreSQL in real usage.
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./library.db")
 

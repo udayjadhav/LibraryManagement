@@ -6,7 +6,6 @@ from sqlalchemy.pool import StaticPool
 from app.db import Base, get_db
 from app.main import app
 
-
 # Keep tests file-free by using in-memory SQLite.
 TEST_DATABASE_URL = "sqlite://"
 engine = create_engine(
@@ -43,14 +42,84 @@ def test_ui_root_is_served():
 def test_create_and_update_book():
     created = client.post(
         "/books",
-        json={"title": "The Hobbit", "author": "J.R.R. Tolkien", "description": "Fantasy"},
+        json={
+            "title": "The Hobbit",
+            "author": "J.R.R. Tolkien",
+            "description": "Fantasy",
+        },
     )
     assert created.status_code == 201
     assert created.json()["is_borrowed"] is False
 
-    updated = client.put(f"/books/{created.json()['id']}", json={"title": "The Hobbit (Updated)"})
+    updated = client.put(
+        f"/books/{created.json()['id']}", json={"title": "The Hobbit (Updated)"}
+    )
     assert updated.status_code == 200
     assert updated.json()["title"] == "The Hobbit (Updated)"
+
+
+def test_book_duplicate_is_rejected_case_insensitive():
+    first = client.post(
+        "/books",
+        json={"title": "Dune", "author": "Frank Herbert", "description": "Sci-fi"},
+    )
+    assert first.status_code == 201
+
+    duplicate = client.post(
+        "/books",
+        json={"title": " dune ", "author": " FRANK HERBERT ", "description": "Classic"},
+    )
+    assert duplicate.status_code == 409
+    assert (
+        duplicate.json()["detail"] == "Book with same title and author already exists"
+    )
+
+
+def test_book_duplicate_on_update_is_rejected():
+    first = client.post("/books", json={"title": "Dune", "author": "Frank Herbert"})
+    second = client.post("/books", json={"title": "1984", "author": "George Orwell"})
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    duplicate_update = client.put(
+        f"/books/{second.json()['id']}",
+        json={"title": " dune ", "author": " FRANK HERBERT "},
+    )
+    assert duplicate_update.status_code == 409
+    assert (
+        duplicate_update.json()["detail"]
+        == "Book with same title and author already exists"
+    )
+
+
+def test_member_duplicate_email_is_rejected_case_insensitive():
+    first = client.post(
+        "/members",
+        json={"name": "Alice", "email": "alice@example.com"},
+    )
+    assert first.status_code == 201
+
+    duplicate = client.post(
+        "/members",
+        json={"name": "Another", "email": " ALICE@EXAMPLE.COM "},
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "Member email already exists"
+
+
+def test_member_duplicate_email_on_update_is_rejected_case_insensitive():
+    first = client.post(
+        "/members", json={"name": "Alice", "email": "alice@example.com"}
+    )
+    second = client.post("/members", json={"name": "Bob", "email": "bob@example.com"})
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    duplicate_update = client.put(
+        f"/members/{second.json()['id']}", json={"email": " ALICE@EXAMPLE.COM "}
+    )
+    assert duplicate_update.status_code == 409
+    assert duplicate_update.json()["detail"] == "Member email already exists"
 
 
 def test_member_borrow_return_flow():
@@ -97,8 +166,14 @@ def test_list_borrowings_by_member():
     b1 = client.post("/books", json={"title": "Book A", "author": "Author A"})
     b2 = client.post("/books", json={"title": "Book B", "author": "Author B"})
 
-    client.post("/borrowings/borrow", json={"member_id": m1.json()["id"], "book_id": b1.json()["id"]})
-    client.post("/borrowings/borrow", json={"member_id": m2.json()["id"], "book_id": b2.json()["id"]})
+    client.post(
+        "/borrowings/borrow",
+        json={"member_id": m1.json()["id"], "book_id": b1.json()["id"]},
+    )
+    client.post(
+        "/borrowings/borrow",
+        json={"member_id": m2.json()["id"], "book_id": b2.json()["id"]},
+    )
 
     m1_borrowings = client.get(f"/borrowings?member_id={m1.json()['id']}")
     assert m1_borrowings.status_code == 200
@@ -107,8 +182,12 @@ def test_list_borrowings_by_member():
 
 
 def test_active_only_false_includes_returned_records():
-    member = client.post("/members", json={"name": "Filter", "email": "filter@example.com"})
-    book = client.post("/books", json={"title": "Filter Book", "author": "Filter Author"})
+    member = client.post(
+        "/members", json={"name": "Filter", "email": "filter@example.com"}
+    )
+    book = client.post(
+        "/books", json={"title": "Filter Book", "author": "Filter Author"}
+    )
     borrowing = client.post(
         "/borrowings/borrow",
         json={"member_id": member.json()["id"], "book_id": book.json()["id"]},
@@ -149,7 +228,9 @@ def test_inactive_member_cannot_borrow():
 
 
 def test_borrow_missing_member_or_book():
-    book = client.post("/books", json={"title": "Sapiens", "author": "Yuval Noah Harari"})
+    book = client.post(
+        "/books", json={"title": "Sapiens", "author": "Yuval Noah Harari"}
+    )
     member = client.post("/members", json={"name": "Bob", "email": "bob@example.com"})
     assert book.status_code == 201
     assert member.status_code == 201
@@ -176,8 +257,12 @@ def test_return_missing_borrowing():
 
 
 def test_double_return_is_rejected():
-    member = client.post("/members", json={"name": "Carol", "email": "carol@example.com"})
-    book = client.post("/books", json={"title": "Clean Code", "author": "Robert Martin"})
+    member = client.post(
+        "/members", json={"name": "Carol", "email": "carol@example.com"}
+    )
+    book = client.post(
+        "/books", json={"title": "Clean Code", "author": "Robert Martin"}
+    )
     borrowing = client.post(
         "/borrowings/borrow",
         json={"member_id": member.json()["id"], "book_id": book.json()["id"]},
@@ -193,7 +278,9 @@ def test_double_return_is_rejected():
 
 
 def test_book_can_be_borrowed_again_after_return():
-    member = client.post("/members", json={"name": "Retry", "email": "retry@example.com"})
+    member = client.post(
+        "/members", json={"name": "Retry", "email": "retry@example.com"}
+    )
     book = client.post("/books", json={"title": "Retry Book", "author": "Retry Author"})
     first_borrowing = client.post(
         "/borrowings/borrow",
